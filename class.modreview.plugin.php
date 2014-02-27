@@ -70,11 +70,11 @@ class ModReview extends Gdn_Plugin {
   public function Controller_Clear($Sender) {
     $this->_UpdateReview($Sender, 'NULL', 'NULL');
   }
-  
+
   /**
    * This sets the review data to whatever is passed and redirects to the post
    * that was operated on.
-   * 
+   *
    * @param PluginController $Sender
    * @param string $Date Date the review occurred
    * @param int $UserID ID of the reviewer
@@ -86,37 +86,37 @@ class ModReview extends Gdn_Plugin {
     if(!$Session->CheckPermission('Garden.Moderation.Manage')) {
       return;
     }
-    
+
     // Add the review by filling out the object's review columns
     $Args = $Sender->RequestArgs;
     $ObjectType = GetValue(1, $Args, FALSE);
     $ObjectID = GetValue(2, $Args, FALSE);
     $Path = FALSE;
-    
+
     $SQL = Gdn::SQL();
     if($ObjectID && $ObjectType) {
       switch($ObjectType) {
         case 'comment':
           $SQL->Update('Comment')
-                ->Set('ModReviewDate', $Date)
-                ->Set('ModReviewUserID', $UserID)
-                ->Where('CommentID', $ObjectID)
-                ->Put();
+                  ->Set('ModReviewDate', $Date)
+                  ->Set('ModReviewUserID', $UserID)
+                  ->Where('CommentID', $ObjectID)
+                  ->Put();
           $Path = '/discussion/comment/' . $ObjectID;
           break;
         case 'discussion':
           $SQL->Update('Discussion')
-                ->Set('ModReviewDate', $Date)
-                ->Set('ModReviewUserID', $UserID)
-                ->Where('DiscussionID', $ObjectID)
-                ->Put();
+                  ->Set('ModReviewDate', $Date)
+                  ->Set('ModReviewUserID', $UserID)
+                  ->Where('DiscussionID', $ObjectID)
+                  ->Put();
           $Path = '/discussion/' . $ObjectID;
           break;
         default:
           break;
       }
     }
-    
+
     if(!$Path) {
       throw new Gdn_UserException('Unable to review that post or know where you came from!');
     }
@@ -140,20 +140,34 @@ class ModReview extends Gdn_Plugin {
     if(!$Session->CheckPermission('Garden.Moderation.Manage')) {
       return;
     }
-    
+
     $Review = $this->_GetReviewObject($Args);
-    
+
     if($Review->Date != FALSE) {
       $Sender->EventArguments['CssClass'] .= ' ModReviewed';
     }
   }
-  
+
+  public function DiscussionController_AfterDiscussionMeta_Handler($Sender, $Args) {
+    $this->_AddReviewButton($Sender, $Args);
+  }
+
+  public function DiscussionController_InsideCommentMeta_Handler($Sender, $Args) {
+    $this->_AddReviewButton($Sender, $Args);
+  }
+
+  public function DiscussionController_CommentOptions_Handler($Sender, $Args) {
+    if(!version_compare(APPLICATION_VERSION, '2.1b2', '>=')) {
+      $this->_AddReviewButton($Sender, $Args);
+    }
+  }
+
   /**
    * Add an appropriate mod review link. Unreviewed posts get a 'Mark Reviewed'
    * link. Reviewed posts get a 'Remove Your Review' link or a 'Reviewed by User'
    * link, depending on what user reviewed the post (You or someone else).
    */
-  public function DiscussionController_CommentOptions_Handler($Sender, $Args) {
+  private function _AddReviewButton($Sender, $Args) {
     $Session = Gdn::Session();
     if(!$Session->CheckPermission('Garden.Moderation.Manage')) {
       return;
@@ -168,18 +182,15 @@ class ModReview extends Gdn_Plugin {
       else {
         // Load up the username of the reviewer
         $Reviewer = Gdn::UserModel()->GetID($Review->UserID);
-        
+
         // Show a link to message the user if it is not the current user
         echo Wrap(
                 Anchor(
-                        sprintf(T('Plugins.ModReview.ReviewedOther'), $Reviewer->Name),
-                        Url('messages/add/' . $Reviewer->Name)
-                        ),
-                'span',
-                array(
-                    'title' => sprintf(T('Plugins.ModReview.SendMessage'), $Reviewer->Name, $Review->Date)
+                        sprintf(T('Plugins.ModReview.ReviewedOther'), $Reviewer->Name), Url('messages/add/' . $Reviewer->Name)
+                ), 'span', array(
+            'title' => sprintf(T('Plugins.ModReview.SendMessage'), $Reviewer->Name, $Review->Date)
                 )
-              );
+        );
       }
     }
     else {
@@ -210,7 +221,7 @@ class ModReview extends Gdn_Plugin {
       $Object = new stdClass();
       $Object->ModReviewUserID = FALSE;
     }
-    
+
     if($Object->ModReviewUserID) {
       $Return->UserID = $Object->ModReviewUserID;
       $Return->Date = $Object->ModReviewDate;
@@ -221,7 +232,7 @@ class ModReview extends Gdn_Plugin {
     }
     return $Return;
   }
-  
+
   /**
    * Single point to add in external resources
    */
@@ -253,4 +264,5 @@ class ModReview extends Gdn_Plugin {
   public function Setup() {
     $this->Structure();
   }
+
 }
